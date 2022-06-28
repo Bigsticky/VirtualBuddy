@@ -34,6 +34,16 @@ public final class VBDownloader: NSObject {
     @Published
     public private(set) var state = State.idle
 
+    @MainActor
+    private func getDownloadsBaseURL() throws -> URL {
+        let baseURL = library.libraryURL.appendingPathComponent("_Downloads")
+        if !FileManager.default.fileExists(atPath: baseURL.path) {
+            try FileManager.default.createDirectory(at: baseURL, withIntermediateDirectories: true)
+        }
+
+        return baseURL
+    }
+
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
         return URLSession(configuration: config, delegate: self, delegateQueue: .main)
@@ -48,7 +58,7 @@ public final class VBDownloader: NSObject {
         state = .downloading(nil, nil)
 
         let filename = url.lastPathComponent
-        guard let destURL = (try? library.getDownloadsBaseURL())?.appendingPathComponent(filename) else {
+        guard let destURL = (try? getDownloadsBaseURL())?.appendingPathComponent(filename) else {
             state = .failed("Failed to create directory for downloads at \(library.libraryURL.path)")
             return
         }
@@ -125,10 +135,6 @@ extension VBDownloader: URLSessionDownloadDelegate, URLSessionDelegate {
         }
 
         do {
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
-            }
-
             try FileManager.default.moveItem(at: location, to: destinationURL)
 
             DispatchQueue.main.async { self.state = .done(destinationURL) }
